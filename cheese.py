@@ -14,12 +14,23 @@ O2_AVALIABILITY = 2
 NUTRIENT_AVALIABILITY = 3
 
 class CheeseGrid:
-    def __init__(self, width, height, depth, to_pierce):
-        self.width = width
-        self.height = height
-        self.depth = depth
-        self.cells = None
+    def __init__(self, volume, to_pierce, density, latent_factor):
+        self.width = volume
+        self.height = volume
+        self.depth = volume
         self.to_pierce = to_pierce
+        self.density = density
+        self.latent_factor = latent_factor
+        self.cells = None
+        
+        self.offset_x = (self.width % self.to_pierce) // 2
+        if self.offset_x == 0 and self.width >= self.to_pierce: 
+            self.offset_x = self.to_pierce // 2
+            
+        self.offset_y = (self.height % self.to_pierce) // 2
+        if self.offset_y == 0 and self.height >= self.to_pierce: 
+            self.offset_y = self.to_pierce // 2
+
         self.initialize()
 
     def initialize(self):
@@ -27,27 +38,54 @@ class CheeseGrid:
         for x in range(self.width):
             for y in range(self.height):
                 for z in range(self.depth):
-                    if z == 0 and x % self.to_pierce == 0 and y % self.to_pierce == 0:
+                    if z == 0 and (x - self.offset_x) % self.to_pierce == 0 and (y - self.offset_y) % self.to_pierce == 0:
                         self.pierce(x, y)
                         break
+                    
                     if (z == 0 or x == 0 or x == self.width-1 or y == 0 or y == self.height-1):
                         self.cells[x][y][z] = [PIERCED, 0, 100, 0] 
                         continue
+                        
                     p = random.random()
                     if p < 0.4:
                         self.cells[x][y][z] = [RESISTANT, 0, None, random.randint(30, 70)]
                     else:
                         self.cells[x][y][z] = [PERMISSIVE, 0, None, random.randint(80, 100)]
+                    
                     avaliability = self.get_o2_avaliability(x, y, z)
                     base_probability = (self.cells[x][y][z][NUTRIENT_AVALIABILITY] / 100.0) * (avaliability / 100.0)
-                    K = 0.02 
-                    final_probability = base_probability * K
+                    final_probability = base_probability * self.latent_factor
                     if random.random() < final_probability:
-                        self.cells[x][y][z][CELL_STATE] = LATENT  
+                        self.cells[x][y][z][CELL_STATE] = LATENT
 
     def pierce(self, x, y):
         for z in range(self.depth):
-            self.cells[x][y][z] = [PIERCED, 0, 100, 0] 
+            self.cells[x][y][z] = [PIERCED, 0, 100, 0]
+
+    def get_o2_distance(self, x, y, z):
+        dx = (x - self.offset_x) % self.to_pierce
+        dy = (y - self.offset_y) % self.to_pierce
+        
+        x_distance = min(dx, self.to_pierce - dx)
+        y_distance = min(dy, self.to_pierce - dy)
+        
+        xy_distance = math.sqrt(x_distance**2 + y_distance**2)
+        return min(xy_distance, self.get_border_distance(x, y, z))
+    
+    def get_o2_avaliability(self, x, y, z):
+        cell = self.cells[x][y][z]
+        if cell[CELL_STATE] == PIERCED:
+            return 100
+        distance = self.get_o2_distance(x, y, z)
+        avaliability = max(0, 100 - distance * self.density)
+        cell[O2_AVALIABILITY] = avaliability
+        return avaliability
+    
+    def get_border_distance(self, x, y, z):
+        dist_x = min(x, self.width - 1 - x)
+        dist_y = min(y, self.height - 1 - y)
+        dist_z = z
+        return min(dist_x, dist_y, dist_z)
 
     def pass_day(self):
         for x in range(self.width):
@@ -66,29 +104,6 @@ class CheeseGrid:
                             cell[CELL_STATE] = INFECTIOUS
                         if cell[CELL_STATE] == INFECTIOUS:
                             self.try_infect(x, y, z)
-
-    def get_o2_avaliability(self, x, y, z):
-        cell = self.cells[x][y][z]
-        if cell[CELL_STATE] == PIERCED:
-            return 100
-        distance = self.get_o2_distance(x, y, z)
-        avaliability = max(0, 100 - distance * 10)
-        cell[O2_AVALIABILITY] = avaliability
-        return avaliability
-
-    def get_o2_distance(self, x, y, z):
-        dx = x % self.to_pierce
-        dy = y % self.to_pierce
-        x_distance = min(dx, self.to_pierce - dx)
-        y_distance = min(dy, self.to_pierce - dy)
-        xy_distance = math.sqrt(x_distance**2 + y_distance**2)
-        return min(xy_distance, self.get_border_distance(x, y, z))
-    
-    def get_border_distance(self, x, y, z):
-        dist_x = min(x, self.width - 1 - x)
-        dist_y = min(y, self.height - 1 - y)
-        dist_z = z
-        return min(dist_x, dist_y, dist_z)
 
     def try_infect(self, x, y, z):
         neighbours = self.get_neighbours(x, y, z)

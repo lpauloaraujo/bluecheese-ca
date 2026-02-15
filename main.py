@@ -1,10 +1,12 @@
+import random
 import pygame
 from cheese import CheeseGrid
 from cheese import PERMISSIVE, RESISTANT, LATENT, INFECTIOUS, PIERCED, STAGNANT
 from cheese import CELL_STATE
 
+random.seed(42)
 
-grid = CheeseGrid(width=70, height=70, depth=70, to_pierce=15)
+grid = CheeseGrid(volume=70, to_pierce=15, density=10, latent_factor=0.05)
 
 CELL = 10
 
@@ -21,18 +23,26 @@ pygame.init()
 tela = pygame.display.set_mode((grid.width * CELL, grid.height * CELL))
 clock = pygame.time.Clock()
 
-slice_z = 1  
+slice_z = 35  
 
 PASS_DAY_EVENT = pygame.USEREVENT + 1
 pygame.time.set_timer(PASS_DAY_EVENT, 100)
 
+MAX_DAYS = 130
+day_count = 0
+
 running = True
 while running:
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == PASS_DAY_EVENT:
-            grid.pass_day()
+            if day_count < MAX_DAYS:
+                grid.pass_day()
+                day_count += 1
+            else:
+                pygame.time.set_timer(PASS_DAY_EVENT, 0) 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 slice_z = (slice_z + 1) % grid.depth
